@@ -1,0 +1,295 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <time.h>
+
+#define MAX 100
+#define WORD_LEN 50
+#define MAX_PAGES 5
+
+char undoStack[MAX][WORD_LEN], redoStack[MAX][WORD_LEN], pages[MAX_PAGES][MAX][WORD_LEN];
+int topUndo = -1, topRedo = -1, currentPage = 0;
+
+void pushUndo(char word[]) {
+    if (topUndo < MAX - 1) strcpy(undoStack[++topUndo], word);
+}
+
+void pushRedo(char word[]) {
+    if (topRedo < MAX - 1) strcpy(redoStack[++topRedo], word);
+}
+
+void clearRedo() {
+    topRedo = -1;
+}
+
+void typeWord() {
+    char word[WORD_LEN];
+    printf("Enter word: ");
+    scanf("%s", word);
+    pushUndo(word);
+    clearRedo();
+}
+
+void undo() {
+    if (topUndo >= 0) {
+        pushRedo(undoStack[topUndo--]);
+        printf("Undo successful.\n");
+    } else printf("Nothing to undo.\n");
+}
+
+void redo() {
+    if (topRedo >= 0) {
+        pushUndo(redoStack[topRedo--]);
+        printf("Redo successful.\n");
+    } else printf("Nothing to redo.\n");
+}
+
+void showText() {
+    printf("\nCurrent text: ");
+    for (int i = 0; i <= topUndo; i++) printf("%s ", undoStack[i]);
+    printf("\n");
+}
+
+void countWords() {
+    printf("Total words: %d\n", topUndo + 1);
+}
+
+void showReverse() {
+    printf("Text in reverse: ");
+    for (int i = topUndo; i >= 0; i--) printf("%s ", undoStack[i]);
+    printf("\n");
+}
+
+void findAndReplace() {
+    char oldWord[WORD_LEN], newWord[WORD_LEN];
+    int found = 0;
+    printf("Enter word to find: ");
+    scanf("%s", oldWord);
+    printf("Enter word to replace with: ");
+    scanf("%s", newWord);
+    for (int i = 0; i <= topUndo; i++) {
+        if (strcmp(undoStack[i], oldWord) == 0) {
+            strcpy(undoStack[i], newWord);
+            found = 1;
+        }
+    }
+    printf(found ? "Word replaced successfully.\n" : "Word not found.\n");
+}
+
+void deleteLastWord() {
+    if (topUndo >= 0) {
+        printf("Deleted word: %s\n", undoStack[topUndo--]);
+    } else printf("Nothing to delete.\n");
+}
+
+void clearText() {
+    topUndo = -1;
+    printf("All text cleared.\n");
+}
+
+void saveToFile() {
+    if (topUndo < 0) {
+        printf("No text to save.\n");
+        return;
+    }
+    char filename[100];
+    printf("Enter filename to save: ");
+    scanf("%s", filename);
+    FILE *file = fopen(filename, "w");
+    if (!file) {
+        printf("Error saving file.\n");
+        return;
+    }
+    for (int i = 0; i <= topUndo; i++) fprintf(file, "%s ", undoStack[i]);
+    fclose(file);
+    printf("Text saved to %s\n", filename);
+}
+
+void loadFromFile() {
+    char filename[100];
+    printf("Enter filename to load: ");
+    scanf("%s", filename);
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("No saved file found.\n");
+        return;
+    }
+    topUndo = -1;
+    char word[WORD_LEN];
+    while (fscanf(file, "%s", word) != EOF) pushUndo(word);
+    fclose(file);
+    printf("Text loaded from %s\n", filename);
+}
+
+void toUpperCase() {
+    for (int i = 0; i <= topUndo; i++)
+        for (int j = 0; undoStack[i][j]; j++)
+            undoStack[i][j] = toupper(undoStack[i][j]);
+    printf("All text converted to uppercase.\n");
+}
+
+void toLowerCase() {
+    for (int i = 0; i <= topUndo; i++)
+        for (int j = 0; undoStack[i][j]; j++)
+            undoStack[i][j] = tolower(undoStack[i][j]);
+    printf("All text converted to lowercase.\n");
+}
+
+void countWordFrequency() {
+    int frequency[MAX] = {0}, count;
+    for (int i = 0; i <= topUndo; i++) {
+        count = 1;
+        if (frequency[i] == 0) {
+            for (int j = i + 1; j <= topUndo; j++) {
+                if (strcmp(undoStack[i], undoStack[j]) == 0) {
+                    frequency[j] = -1;
+                    count++;
+                }
+            }
+            printf("Word: %s, Frequency: %d\n", undoStack[i], count);
+        }
+    }
+}
+
+void highlightWord() {
+    char word[WORD_LEN];
+    printf("Enter the word to highlight: ");
+    scanf("%s", word);
+    for (int i = 0; i <= topUndo; i++) {
+        if (strcmp(undoStack[i], word) == 0)
+            printf("***%s*** ", undoStack[i]);
+        else printf("%s ", undoStack[i]);
+    }
+    printf("\n");
+}
+
+void showWordStatistics() {
+    int maxLength = 0, minLength = WORD_LEN;
+    char longest[WORD_LEN], shortest[WORD_LEN];
+    for (int i = 0; i <= topUndo; i++) {
+        int len = strlen(undoStack[i]);
+        if (len > maxLength) {
+            maxLength = len;
+            strcpy(longest, undoStack[i]);
+        }
+        if (len < minLength) {
+            minLength = len;
+            strcpy(shortest, undoStack[i]);
+        }
+    }
+    printf("Longest word: %s\n", longest);
+    printf("Shortest word: %s\n", shortest);
+}
+
+void switchPage() {
+    int page;
+    printf("Enter page number (0-%d): ", MAX_PAGES - 1);
+    scanf("%d", &page);
+    if (page >= 0 && page < MAX_PAGES) {
+        currentPage = page;
+        topUndo = -1;
+        printf("Switched to page %d\n", currentPage);
+    } else printf("Invalid page number.\n");
+}
+
+void saveCurrentPage() {
+    FILE *file = fopen("notepad_page.txt", "w");
+    if (!file) {
+        printf("Error saving file.\n");
+        return;
+    }
+    for (int i = 0; i <= topUndo; i++) fprintf(file, "%s ", undoStack[i]);
+    fclose(file);
+    printf("Page saved.\n");
+}
+
+void loadPage() {
+    FILE *file = fopen("notepad_page.txt", "r");
+    if (!file) {
+        printf("No saved page found.\n");
+        return;
+    }
+    topUndo = -1;
+    char word[WORD_LEN];
+    while (fscanf(file, "%s", word) != EOF) pushUndo(word);
+    fclose(file);
+    printf("Page loaded.\n");
+}
+
+void autoSave() {
+    static time_t lastSave = 0;
+    time_t currentTime = time(NULL);
+    if (currentTime - lastSave >= 60 && topUndo >= 0) {
+        FILE *file = fopen("autosave.txt", "w");
+        if (!file) return;
+        for (int i = 0; i <= topUndo; i++) fprintf(file, "%s ", undoStack[i]);
+        fclose(file);
+        lastSave = currentTime;
+        printf("\n[Auto-saved to autosave.txt]\n");
+    }
+}
+
+void searchWord() {
+    char word[WORD_LEN];
+    int found = 0;
+    printf("Enter word to search: ");
+    scanf("%s", word);
+    for (int i = 0; i <= topUndo; i++) {
+        if (strcmp(undoStack[i], word) == 0) {
+            printf("Word '%s' found at position %d.\n", word, i + 1);
+            found = 1;
+        }
+    }
+    if (!found) printf("Word not found.\n");
+}
+
+void showTextWithLineNumbers() {
+    printf("\nCurrent text with line numbers:\n");
+    for (int i = 0; i <= topUndo; i++) printf("%d. %s\n", i + 1, undoStack[i]);
+}
+
+void makeBold() {
+    for (int i = 0; i <= topUndo; i++) printf("**%s** ", undoStack[i]);
+    printf("\n");
+}
+
+void makeItalic() {
+    for (int i = 0; i <= topUndo; i++) printf("*%s* ", undoStack[i]);
+    printf("\n");
+}
+
+int main() {
+    int choice;
+    while (1) {
+        printf("\n1.Type 2.Undo 3.Redo 4.Show 5.Count 6.Reverse 7.FindReplace 8.DeleteLast 9.Clear 10.Save 11.Load 12.Upper 13.Lower 14.Freq 15.Highlight 16.Stats 17.SwitchPage 18.SavePage 19.LoadPage 20.Search 21.LineNumbers 22.Bold 23.Italic 0.Exit\nChoice: ");
+        scanf("%d", &choice);
+        autoSave();
+        switch (choice) {
+            case 1: typeWord(); break;
+            case 2: undo(); break;
+            case 3: redo(); break;
+            case 4: showText(); break;
+            case 5: countWords(); break;
+            case 6: showReverse(); break;
+            case 7: findAndReplace(); break;
+            case 8: deleteLastWord(); break;
+            case 9: clearText(); break;
+            case 10: saveToFile(); break;
+            case 11: loadFromFile(); break;
+            case 12: toUpperCase(); break;
+            case 13: toLowerCase(); break;
+            case 14: countWordFrequency(); break;
+            case 15: highlightWord(); break;
+            case 16: showWordStatistics(); break;
+            case 17: switchPage(); break;
+            case 18: saveCurrentPage(); break;
+            case 19: loadPage(); break;
+            case 20: searchWord(); break;
+            case 21: showTextWithLineNumbers(); break;
+            case 22: makeBold(); break;
+            case 23: makeItalic(); break;
+            case 0: return 0;
+            default: printf("Invalid choice\n");
+        }
+    }
+}
